@@ -16,8 +16,8 @@ Rom:
 # Specify NorFlash when using backup memory.
 # Required when creating a card application (CCI).
 CardInfo:
-  CardDevice: None
-  MediaType: Card2
+  CardDevice: NorFlash
+  MediaType: Card1
 
 TitleInfo:
   UniqueId: 0x05B6D

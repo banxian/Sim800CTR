@@ -63,8 +63,8 @@ void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
     //framebrush.setColor(bgcolor);
     //painter.setBrush(framebrush);
     //painter.drawRoundedRect(fRect, 4, 4, Qt::AbsoluteSize);
-    render.SetColor(bgcolor >> 16, bgcolor >> 8 & 0xFF, bgcolor & 0xFF);
-    render.FillRectangle(fRect.x, fRect.y, fRect.w, fRect.h);
+    //render.SetColor(bgcolor >> 16, bgcolor >> 8 & 0xFF, bgcolor & 0xFF);
+    //render.FillRectangle(fRect.x, fRect.y, fRect.w, fRect.h);
     render.SetColor(framecolor >> 16, framecolor >> 8 & 0xFF, framecolor & 0xFF);
     render.DrawLine(fRect.x, fRect.y, fRect.x + fRect.w, fRect.y);
     render.DrawLine(fRect.x, fRect.y + fRect.h, fRect.x + fRect.w, fRect.y + fRect.h);

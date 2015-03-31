@@ -1,0 +1,32 @@
+BasicInfo:
+  # Specifies the title name of the program.
+  Title		: "sim800j"
+  CompanyCode	: "00"
+  ProductCode	: "CTR-P-SM8J"
+
+Rom:
+  # Specifies the file root that is included in the ROM .
+  # Files under this path will be loaded from the file system that the ROM includes.
+  HostRoot      : romfiles
+  
+  # Specify the save data size for download applications.
+  # Required when creating a download application (CIA).
+  SaveDataSize: 2MB
+
+# Specify NorFlash when using backup memory.
+# Required when creating a card application (CCI).
+CardInfo:
+  CardDevice: None
+  MediaType: Card2
+
+TitleInfo:
+  UniqueId: 0x05B6D
+
+AccessControlInfo:
+  UseExtSaveData: true          # Specify true when using expanded save data
+  ExtSaveDataNumber: 0x05B6D    # Uses an unique ID as the expanded save data number
+
+  FileSystemAccess:             # Specify when using the SdmcWriteOnly archive
+   - DirectSdmc
+   - DirectSdmcWrite
+   - Debug

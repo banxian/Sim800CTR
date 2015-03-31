@@ -1,0 +1,76 @@
+#!/usr/bin/env omake
+#----------------------------------------------------------------------------
+# Project:  Horizon
+# File:     OMakefile
+#
+# Copyright (C)2009-2012 Nintendo Co., Ltd.  All rights reserved.
+#
+# These coded instructions, statements, and computer programs contain
+# proprietary information of Nintendo of America Inc. and/or Nintendo
+# Company Ltd., and are protected by Federal copyright law.  They may
+# not be disclosed to third parties or copied or duplicated in any form,
+# in whole or in part, without the prior written consent of Nintendo.
+#
+# $Rev: 46365 $
+#----------------------------------------------------------------------------
+
+SAMPLED_DEMOS_COMMON_INCLUDE_DIR   =   $(dir ../../common/include)
+INCLUDES           +=   $(SAMPLED_DEMOS_COMMON_INCLUDE_DIR)
+
+# Describes the target that the process supports.
+# The system name should always be "Process".
+SUPPORTED_TARGETS   =   CTR-T*.Process.MPCore.*
+
+CTR_APPTYPE = CARD SD
+
+# Specifies the source code to build.
+SOURCES[]           =
+                        ../Common/FsSampleCommon.cpp
+                        SaveDataExporter.cpp
+                        MainUntFrame.cpp
+                        KeyItem.cpp
+                        NekoDriver.cpp
+                        NekoDriverIO.cpp
+                        NekoDriverMem.cpp
+                        NekoDriverDebug.cpp
+                        CheatTypes.cpp
+                        DbCentre.cpp
+                        ANSI/65C02.cpp
+                        ANSI/65C02CPU.c
+                        ANSI/w65c02cpu.cpp
+                        ANSI/w65c02op.cpp
+                        AddonFuncUnt.cpp
+
+
+CXXFLAGS	+= --asm --interleave
+
+CCFLAGS		+= -DNDEBUG=1 -DSHIP_BUILD=1 -DHANDYPSP -DFAKENMI -D_AUTOTEST -D_LOGASM -I./
+
+# Specifies the program name.
+# No extension is needed.
+TARGET_PROGRAM      =   Sim800
+
+# When specifying a proprietary RSF file, describe as shown below.
+ROM_SPEC_FILE       =   Sim800.rsf
+
+CTR_BANNER_SPEC     =   Sim800.bsf
+
+#SHADER_BIN          =   nnfont_RectDrawerShader.shbin
+
+LIBS               +=   lib_demo lib_applet libnn_enc
+
+# Specifies the file root that is included in the ROM .
+# Files under this path will be loaded from the file system that the ROM includes.
+ROMFS_ROOT          =   romfiles
+
+#SHADER_PATH         =   $(ROMFS_ROOT)/$(SHADER_BIN)
+
+#ROMFS_DEPENDENCIES  =   $(SHADER_PATH)
+
+include $(ROOT_OMAKE)/modulerules
+
+build: $(DEFAULT_TARGETS)
+
+#$(SHADER_PATH): $(CTRSDK_ROOT)/resources/shaders/font/$(SHADER_BIN)
+#    mkdir -p $(dirname $@)
+#    cp $< $@

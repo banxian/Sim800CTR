@@ -859,9 +859,9 @@ bool TNekoDriver::LoadBROM( const std::string& filename )
     while (true) {
         s32 readed;
         romfile.TryRead(&readed, fBROMBuffer + 0x8000 * page + 0x4000, 0x4000);
-        hardlog("LoadBROM: TryRead: 0x%08X\n", readed);
+        //hardlog("LoadBROM: TryRead: 0x%08X\n", readed);
         romfile.TryRead(&readed, fBROMBuffer + 0x8000 * page, 0x4000);
-        hardlog("LoadBROM: TryRead: 0x%08X, page: 0x%X\n", readed, page);
+        //hardlog("LoadBROM: TryRead: 0x%08X, page: 0x%X\n", readed, page);
         page++;
         if (readed == 0) {
             break;
@@ -893,9 +893,9 @@ bool TNekoDriver::LoadFullNorFlash( const std::string& filename )
     while (true) {
         s32 readed;
         norfile.TryRead(&readed, fNorBuffer + 0x8000 * page + 0x4000, 0x4000);
-        hardlog("LoadFullNorFlash: TryRead: 0x%08X\n", readed);
+        //hardlog("LoadFullNorFlash: TryRead: 0x%08X\n", readed);
         norfile.TryRead(&readed, fNorBuffer + 0x8000 * page, 0x4000);
-        hardlog("LoadFullNorFlash: TryRead: 0x%08X, page: 0x%X\n", readed, page);
+        //hardlog("LoadFullNorFlash: TryRead: 0x%08X, page: 0x%X\n", readed, page);
         page++;
         if (readed == 0) {
             break;

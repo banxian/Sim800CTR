@@ -39,62 +39,37 @@ namespace sample { namespace fs { namespace sim800ctr {
 
 namespace
 {
-    enum ENUM_TASK
-    {
-        TASK_NONE,
-        //TASK_SAVE,
-        //TASK_LOAD,
-        //TASK_RENEW,
-
-        TASK_EXPORT,
-        TASK_IMPORT,
-
-        ENUM_TASK_NUM
-    } s_Task;
-
-    enum ENUM_STATE
-    {
-        STATE_NONE,
-        STATE_DATA_FORMATTED,
-        //STATE_SAVE,
-        //STATE_SAVE_DONE,
-        //STATE_LOAD,
-        //STATE_LOAD_SUCCEEDED,
-        //STATE_LOAD_FAILED,
-
-        STATE_EXPORT,
-        STATE_EXPORT_SUCCEDED,
-        STATE_EXPORT_FAILED,
-
-        STATE_IMPORT,
-        STATE_IMPORT_SUCCEDED,
-        STATE_IMPORT_FAILED,
-
-        STATE_RENEW_SUCCEEDED,
-
-        ENUM_STATE_NUM
-    } s_State;
-
-    //enum ENUM_OPERATION
+    //enum ENUM_TASK
     //{
-    //    OPERATION_FILEINDEX,
-    //    OPERATION_DATA,
+    //    TASK_NONE,
+    //    TASK_EXPORT,
+    //    TASK_IMPORT,
 
-    //    ENUM_OPERATION_NUM
-    //} s_Operation;
+    //    ENUM_TASK_NUM
+    //} s_Task;
 
-    //struct DisplayParameter
+    //enum ENUM_STATE
     //{
-    //    bit64 versionValueOnMemory;
-    //} s_DisplayParam;
+    //    STATE_NONE,
+    //    STATE_DATA_FORMATTED,
+    //    STATE_EXPORT,
+    //    STATE_EXPORT_SUCCEDED,
+    //    STATE_EXPORT_FAILED,
 
-    //SaveData s_SaveData;
-    //u32 s_FileIndex;
+    //    STATE_IMPORT,
+    //    STATE_IMPORT_SUCCEDED,
+    //    STATE_IMPORT_FAILED,
+
+    //    STATE_RENEW_SUCCEEDED,
+
+    //    ENUM_STATE_NUM
+    //} s_State;
 
     bool s_IsWorkerThreadAlive;
     nn::os::Event s_WorkerEvent;
-    nn::os::Thread s_WorkerThread;
+    //nn::os::Thread s_WorkerThread;
     TKeyItem* fKeyItems[8][8];
+    nn::hid::TouchPanelReader m_TouchPanelReader;
 } // namespace
 
 void initKeypad();
@@ -104,6 +79,7 @@ void repaintLCD(demo::RenderSystemDrawing &renderSystem);
 void DrawShadowOrPixel( TScreenBuffer* buffer, demo::RenderSystemDrawing &painter, bool semishadow );
 void onKeypadSizeChanged(int w, int h);
 void updateKeypadMatrix();
+void proceedTouch();
 
 
 typedef std::vector<std::string> stringvec;
@@ -226,6 +202,43 @@ void ProceedHid()
     if (hitted) {
         repaintKeypad();
         //updateKeypadRegisters();
+        updateKeypadMatrix();
+    }
+}
+
+void proceedTouch()
+{
+    nn::hid::TouchPanelStatus tpStatus;
+    if (m_TouchPanelReader.ReadLatest(&tpStatus) == false) {
+        return;
+    }
+
+    bool hitted = false;
+    if (tpStatus.touch) {
+        // mouse down
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                TKeyItem* item = fKeyItems[y][x];
+                if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed() == false) {
+                    item->press();
+                    hitted = true;
+                }
+            }
+        }
+    } else {
+        // mouse up
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                TKeyItem* item = fKeyItems[y][x];
+                if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed()) {
+                    item->release();
+                    hitted = true;
+                }
+            }
+        }
+    }
+    if (hitted) {
+        repaintKeypad();
         updateKeypadMatrix();
     }
 }
@@ -499,6 +512,7 @@ using namespace sim800ctr;
 // Call from Demo?
 void MainLoop(demo::RenderSystemDrawing &renderSystem)
 {
+    //proceedTouch();
     ProceedHid();
     ProceedDisplay(renderSystem);
 
@@ -513,13 +527,17 @@ void Initialize(demo::RenderSystemDrawing&)
     //hardlog("heapsize: 0x%08X\n", _ZN2nn2os37_GLOBAL__N__13_os_Memory_cpp_512daea910s_HeapSizeE);
     nn::fs::Initialize();
 
-    const size_t ROMFS_BUFFER_SIZE = 1024 * 64;
-    static char buffer[ROMFS_BUFFER_SIZE];
-    NN_UTIL_PANIC_IF_FAILED(nn::fs::MountRom(16, 16, buffer, ROMFS_BUFFER_SIZE));
+    //const size_t ROMFS_BUFFER_SIZE = 1024 * 64; //nn::fs::GetRomRequiredRomSize(16, 16, true);
+    //static char buffer[ROMFS_BUFFER_SIZE];
+    //NN_UTIL_PANIC_IF_FAILED(nn::fs::MountRom(16, 16, buffer, ROMFS_BUFFER_SIZE));
 
     nn::Result r = nn::fs::MountSdmc();
 
     g_LogMute.Initialize();
+
+    //nn::fnd::DateTime now = nn::fnd::DateTime::GetNow();
+    //hardlog("=============================\n%d/%d/%d %d:%d:%d\n", now.GetYear(), now.GetMonth(), now.GetDay(), now.GetHour(), now.GetMinute(), now.GetSecond());
+    hardlog("=============================\n");
 
     hardlog("initKeypad\n");
     initKeypad();
@@ -532,14 +550,14 @@ void Initialize(demo::RenderSystemDrawing&)
     s_IsWorkerThreadAlive = true;
     //NN_ERR_THROW_FATAL_ALL(s_WorkerThread.TryStartUsingAutoStack(&WorkerThread, 4 * 1024, nn::os::Thread::GetCurrentPriority() + 1));
 
-    hardlog("new TNekoDriver\n");
-    theNekoDriver = new TNekoDriver(); // <- stop
+    //hardlog("new TNekoDriver\n");
+    //theNekoDriver = new TNekoDriver(); // <- stop
 
-    ////theNekoDriver->StartEmulation();
-    ////theNekoDriver->StopEmulation();
-    hardlog("RunDemoBin++\n");
-    theNekoDriver->RunDemoBin("");
-    ////theNekoDriver->LoadFullNorFlash();
+    //////theNekoDriver->StartEmulation();
+    //////theNekoDriver->StopEmulation();
+    //hardlog("RunDemoBin++\n");
+    //theNekoDriver->RunDemoBin("");
+    //////theNekoDriver->LoadFullNorFlash();
     hardlog("Initialize--\n");
 }
 
@@ -550,10 +568,10 @@ void Finalize()
     //s_WorkerEvent.Signal();
     //s_WorkerThread.Join();
 
-    //SaveAppSettings();
-    theNekoDriver->StopEmulation();
-    ////delete[] fLCDStripes;
-    delete theNekoDriver;
+    ////SaveAppSettings();
+    //theNekoDriver->StopEmulation();
+    //////delete[] fLCDStripes;
+    //delete theNekoDriver;
 
     nn::fs::Unmount("rom:");
     nn::fs::Unmount("sdmc:");
@@ -569,7 +587,7 @@ extern "C" void nninitStartUp(void)
     int appmemsize = nn::os::GetAppMemorySize();
     int usingmemsize = nn::os::GetUsingMemorySize();
     nn::os::SetupHeapForMemoryBlock(appmemsize - usingmemsize - 0x2000000);
-    nn::os::SetDeviceMemorySize(0x1000000u); // 32M -> 16M
+    nn::os::SetDeviceMemorySize(0x1000000u); // 32M -> 22M
     nn::init::InitializeAllocator(0x1200000u);     // 8M -> 18M
     //`anonymous namespace'::s_UsingStartUpDefault = 1;
     nn::os::ManagedThread::InitializeEnvironment();

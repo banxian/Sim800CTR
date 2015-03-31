@@ -5,6 +5,8 @@ struct QPoint
 {
     int x;
     int y;
+    QPoint(): x(0), y(0){}
+    QPoint(int x0, int y0): x(x0), y(y0) {}
 };
 
 struct QRect

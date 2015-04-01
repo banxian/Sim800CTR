@@ -39,62 +39,11 @@ namespace sample { namespace fs { namespace sim800ctr {
 
 namespace
 {
-    enum ENUM_TASK
-    {
-        TASK_NONE,
-        //TASK_SAVE,
-        //TASK_LOAD,
-        //TASK_RENEW,
-
-        TASK_EXPORT,
-        TASK_IMPORT,
-
-        ENUM_TASK_NUM
-    } s_Task;
-
-    enum ENUM_STATE
-    {
-        STATE_NONE,
-        STATE_DATA_FORMATTED,
-        //STATE_SAVE,
-        //STATE_SAVE_DONE,
-        //STATE_LOAD,
-        //STATE_LOAD_SUCCEEDED,
-        //STATE_LOAD_FAILED,
-
-        STATE_EXPORT,
-        STATE_EXPORT_SUCCEDED,
-        STATE_EXPORT_FAILED,
-
-        STATE_IMPORT,
-        STATE_IMPORT_SUCCEDED,
-        STATE_IMPORT_FAILED,
-
-        STATE_RENEW_SUCCEEDED,
-
-        ENUM_STATE_NUM
-    } s_State;
-
-    //enum ENUM_OPERATION
-    //{
-    //    OPERATION_FILEINDEX,
-    //    OPERATION_DATA,
-
-    //    ENUM_OPERATION_NUM
-    //} s_Operation;
-
-    //struct DisplayParameter
-    //{
-    //    bit64 versionValueOnMemory;
-    //} s_DisplayParam;
-
-    //SaveData s_SaveData;
-    //u32 s_FileIndex;
-
-    bool s_IsWorkerThreadAlive;
-    nn::os::Event s_WorkerEvent;
-    nn::os::Thread s_WorkerThread;
+    //bool s_IsWorkerThreadAlive;
+    //nn::os::Event s_WorkerEvent;
+    //nn::os::Thread s_WorkerThread;
     TKeyItem* fKeyItems[8][8];
+    //nn::hid::TouchPanelReader m_TouchPanelReader;
 } // namespace
 
 void initKeypad();
@@ -104,6 +53,7 @@ void repaintLCD(demo::RenderSystemDrawing &renderSystem);
 void DrawShadowOrPixel( TScreenBuffer* buffer, demo::RenderSystemDrawing &painter, bool semishadow );
 void onKeypadSizeChanged(int w, int h);
 void updateKeypadMatrix();
+void proceedTouch();
 
 
 typedef std::vector<std::string> stringvec;
@@ -198,6 +148,45 @@ void ProceedHid()
         updateKeypadMatrix();
     }
 }
+
+/*
+void proceedTouch()
+{
+    nn::hid::TouchPanelStatus tpStatus;
+    if (m_TouchPanelReader.ReadLatest(&tpStatus) == false) {
+        return;
+    }
+
+    bool hitted = false;
+    if (tpStatus.touch) {
+        // mouse down
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                TKeyItem* item = fKeyItems[y][x];
+                if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed() == false) {
+                    item->press();
+                    hitted = true;
+                }
+            }
+        }
+    } else {
+        // mouse up
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                TKeyItem* item = fKeyItems[y][x];
+                if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed()) {
+                    item->release();
+                    hitted = true;
+                }
+            }
+        }
+    }
+    if (hitted) {
+        repaintKeypad();
+        updateKeypadMatrix();
+    }
+}
+*/
 
 void initKeypad()
 {
@@ -468,6 +457,7 @@ using namespace sim800ctr;
 // Call from Demo?
 void MainLoop(demo::RenderSystemDrawing &renderSystem)
 {
+    //proceedTouch();
     ProceedHid();
     ProceedDisplay(renderSystem);
 
@@ -494,8 +484,8 @@ void Initialize(demo::RenderSystemDrawing&)
     //_ZN2nn3hid3CTR21IsSelectButtonEnabledEv = (unsigned*)(unsigned(_ZN2nn3hid3CTR21IsSelectButtonEnabledEv) & ~1);
 
 
-    s_WorkerEvent.Initialize(false);
-    s_IsWorkerThreadAlive = true;
+    //s_WorkerEvent.Initialize(false);
+    //s_IsWorkerThreadAlive = true;
     //NN_ERR_THROW_FATAL_ALL(s_WorkerThread.TryStartUsingAutoStack(&WorkerThread, 4 * 1024, nn::os::Thread::GetCurrentPriority() + 1));
 
     hardlog("new TNekoDriver\n");
@@ -512,7 +502,7 @@ void Initialize(demo::RenderSystemDrawing&)
 // Call from Demo.
 void Finalize()
 {
-    s_IsWorkerThreadAlive = false;
+    //s_IsWorkerThreadAlive = false;
     //s_WorkerEvent.Signal();
     //s_WorkerThread.Join();
 

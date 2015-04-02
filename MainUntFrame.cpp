@@ -15,6 +15,9 @@
 
 #include <nn.h>
 #include <nn/os.h>
+#include <nn/gx.h>
+#include <nn/fs.h>
+
 #include <vector>
 #include <string>
 #include "demo.h"
@@ -24,6 +27,9 @@
 #include "KeyItem.h"
 #include "NekoDriver.h"
 #include "AddonFuncUnt.h"
+#include <string.h>
+#include <stdlib.h>
+
 
 //extern "C" unsigned char _ZN41_GLOBAL__N__17_hid_PadReader_cpp_f13c76ec16s_IsEnableSelectE;
 //extern "C" unsigned * _ZN2nn3hid3CTR21IsSelectButtonEnabledEv;
@@ -31,6 +37,33 @@
 extern "C" unsigned _ZN2nn2os37_GLOBAL__N__13_os_Memory_cpp_512daea910s_HeapSizeE;
 
 extern void CheckLCDOffShift0AndEnableWatchDog();
+
+// Texture0
+GLuint s_BmpTexture0Id = 0;
+u32 s_Bmp0Width = 0;
+u32 s_Bmp0Height = 0;
+u32 s_Texture0Width = 0;
+u32 s_Texture0Height = 0;
+
+// Texture1
+GLuint s_BmpTexture1Id = 0;
+u32 s_Bmp1Width = 0;
+u32 s_Bmp1Height = 0;
+u32 s_Texture1Width = 0;
+u32 s_Texture1Height = 0;
+
+demo::RenderSystemDrawing& s_RenderSystem;
+
+void LoadTexture0(void);
+void DeleteTexture0(void);
+void LoadTexture1(void);
+void DeleteTexture1(void);
+u8* GetTextureData(const wchar_t* bmpRomFilename, 
+                   u32& bmpWidth, u32& bmpHeight, u32& textureWidth, u32& textureHeight);
+u8* GetBmpFileData(u8* rawDataBuffer, u32& bmpWidth, u32& bmpHeight);
+u8* GetTextureDataFromBmpFileData(const u32& bmpWidth, const u32& bmpHeight, u8* bmpDataBuffer, 
+                                  u32& textureWidth, u32& textureHeight);
+u32 GetTextureLength(const u32& imageLength);
 
 
 using namespace nn;
@@ -43,7 +76,9 @@ namespace
     //nn::os::Event s_WorkerEvent;
     //nn::os::Thread s_WorkerThread;
     TKeyItem* fKeyItems[8][8];
-    //nn::hid::TouchPanelReader m_TouchPanelReader;
+    nn::hid::TouchPanelReader m_TouchPanelReader;
+    int fLastTouch;
+    int fLastDownX, fLastDownY;
 } // namespace
 
 void initKeypad();
@@ -70,7 +105,7 @@ void DrawMultiLine(const f32 windowCoordinateX, const f32 windowCoordinateY, int
     vec.push_back(text);
 
     if (vec.size() > 8) {
-        vec.erase(vec.begin(), vec.begin() + vec.size() - 18);
+        vec.erase(vec.begin(), vec.begin() + vec.size() - 7);
         text[0] = 0;
     }
 
@@ -136,7 +171,7 @@ void ProceedHid()
                 if (item->press(padStatus.trigger)) {
                     hitted = true;
                 }
-                if (item->press(padStatus.release)) {
+                if (item->release(padStatus.release)) {
                     hitted = true;
                 }
             }
@@ -149,12 +184,16 @@ void ProceedHid()
     }
 }
 
-/*
 void proceedTouch()
 {
     nn::hid::TouchPanelStatus tpStatus;
-    if (m_TouchPanelReader.ReadLatest(&tpStatus) == false) {
+    if (!m_TouchPanelReader.ReadLatest(&tpStatus)) {
         return;
+    }
+
+    if (tpStatus.x && tpStatus.y) {
+        //screenlog(true, "touch: %d, x: %d, y:%d\n", tpStatus.touch, tpStatus.x, tpStatus.y);
+        //hardlog("touch: %d, x: %d, y:%d\n", tpStatus.touch, tpStatus.x, tpStatus.y);
     }
 
     bool hitted = false;
@@ -169,24 +208,38 @@ void proceedTouch()
                 }
             }
         }
-    } else {
-        // mouse up
+    } else if (fLastTouch && fLastDownX && fLastDownY) {
+        // only mouse up
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 TKeyItem* item = fKeyItems[y][x];
-                if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed()) {
+                if (item && item->inRect(QPoint(fLastDownX, fLastDownY)) && item->pressed()) {
                     item->release();
                     hitted = true;
                 }
             }
         }
     }
+    //} else {
+    //    // mouse up
+    //    for (int y = 0; y < 8; y++) {
+    //        for (int x = 0; x < 8; x++) {
+    //            TKeyItem* item = fKeyItems[y][x];
+    //            if (item && item->inRect(QPoint(tpStatus.x, tpStatus.y)) && item->pressed()) {
+    //                item->release();
+    //                hitted = true;
+    //            }
+    //        }
+    //    }
+    //}
     if (hitted) {
         repaintKeypad();
         updateKeypadMatrix();
     }
+    fLastTouch = tpStatus.touch;
+    fLastDownX = tpStatus.x;
+    fLastDownY = tpStatus.y;
 }
-*/
 
 void initKeypad()
 {
@@ -321,7 +374,7 @@ void repaintKeypad()
 
 void repaintKeypad( demo::RenderSystemDrawing &renderSystem )
 {
-    renderSystem.SetClearColor(NN_GX_DISPLAY1, 0.2f, 0.2f, 0.2f, 1.0f);
+    renderSystem.SetClearColor(NN_GX_DISPLAY1, 0.0f, 0.0f, 0.0f, 1.0f);
     renderSystem.Clear();
 
     for (int y = 0; y < 8; y++) {
@@ -457,7 +510,7 @@ using namespace sim800ctr;
 // Call from Demo?
 void MainLoop(demo::RenderSystemDrawing &renderSystem)
 {
-    //proceedTouch();
+    proceedTouch();
     ProceedHid();
     ProceedDisplay(renderSystem);
 
@@ -465,7 +518,7 @@ void MainLoop(demo::RenderSystemDrawing &renderSystem)
 }
 
 // Call from Demo.
-void Initialize(demo::RenderSystemDrawing&)
+void Initialize(demo::RenderSystemDrawing& render)
 {
     nn::fs::Initialize();
 
@@ -476,6 +529,12 @@ void Initialize(demo::RenderSystemDrawing&)
     nn::Result r = nn::fs::MountSdmc();
 
     g_LogMute.Initialize();
+
+    nn::fnd::DateTime now = nn::fnd::DateTime::GetNow();
+    hardlog("=============================\n%d/%d/%d %02d:%02d:%02d\n", now.GetYear(), now.GetMonth(), now.GetDay(), now.GetHour(), now.GetMinute(), now.GetSecond());
+
+    s_RenderSystem = render;
+    LoadTexture0();
 
     hardlog("initKeypad\n");
     initKeypad();
@@ -513,6 +572,8 @@ void Finalize()
 
     nn::fs::Unmount("rom:");
     nn::fs::Unmount("sdmc:");
+
+    DeleteTexture0();
 }
 
 }} // namespace sample::fs
@@ -533,4 +594,254 @@ extern "C" void nninitStartUp(void)
     //nn::dbg::SetDefaultBreakHandler();
     _ZN2nn3dbg26SetDefaultExceptionHandlerEv();
     _ZN2nn3dbg22SetDefaultBreakHandlerEv();
+}
+
+typedef __packed struct BitmapFileHeader
+{
+    u8 bfType[2];
+    u16 bfSize[2];
+    u16 bfReserved1;
+    u16 bfReserved2;
+    u16 bfOffBits[2];
+} BitmapFileHeader;
+
+typedef __packed struct BitmapInfoHeader
+{
+    u32 biSize;
+    s32 biWidth;
+    s32 biHeight;
+    u16 biPlanes;
+    u16 biBitCount;
+    u32 biCompression;
+    u32 biSizeImage;
+    s32 biXPixPerMeter;
+    s32 biYPixPerMeter;
+    u32 biClrUsed;
+    u32 biClrImportant;
+} BitmapInfoHeader;
+
+void LoadTexture0(void)
+{
+    if ( s_BmpTexture0Id != 0 )
+    {
+        DeleteTexture0();
+    }
+
+    wchar_t* bmpRomFilename = L"rom:/sim800stripe.bmp";
+    u8* textureDataPtr = GetTextureData(bmpRomFilename, 
+        s_Bmp0Width, s_Bmp0Height, s_Texture0Width, s_Texture0Height);
+
+    GLenum target = GL_TEXTURE_2D;
+    GLenum internalFormat = GL_RGB_NATIVE_DMP; 
+    GLenum format = GL_RGB_NATIVE_DMP;
+    GLenum type = GL_UNSIGNED_BYTE;
+    GLuint textureId = 0;
+
+    s_RenderSystem.GenerateTexture(target,
+        internalFormat, s_Texture0Width, s_Texture0Height,
+        format, type, textureDataPtr, textureId);
+
+    if ( textureId != 0 )
+    {
+        s_BmpTexture0Id = textureId;
+        NN_LOG("  Create texture (id = %d)\n", textureId);
+    }
+
+    free(textureDataPtr);
+}
+
+void DeleteTexture0(void)
+{        
+    if ( s_BmpTexture0Id != 0 )
+    {
+        bool flag = s_RenderSystem.DeleteTexture(s_BmpTexture0Id);
+        if ( flag )
+        {
+            NN_LOG("  Delete texture. (id = %d)\n", s_BmpTexture0Id);
+            s_BmpTexture0Id = 0;
+        }
+        else
+        {
+            NN_TPANIC_("  Failed to delete texture. (id = %d)\n", s_BmpTexture0Id);            
+        }
+    }
+}
+
+void LoadTexture1(void)
+{
+    //if ( s_BmpTexture1Id != 0 )
+    //{
+    //    DeleteTexture1();
+    //}
+
+    //wchar_t* bmpRomFilename = L"rom:/dandelion.bmp";
+    //u8* textureDataPtr = GetTextureData(bmpRomFilename, 
+    //    s_Bmp1Width, s_Bmp1Height, s_Texture1Width, s_Texture1Height);
+
+    //GLenum target = GL_TEXTURE_2D;
+    //GLenum internalFormat = GL_RGB_NATIVE_DMP; 
+    //GLenum format = GL_RGB_NATIVE_DMP;
+    //GLenum type = GL_UNSIGNED_BYTE;
+    //GLuint textureId = 0;
+
+    //s_RenderSystem.GenerateTexture(target,
+    //    internalFormat, s_Texture1Width, s_Texture1Height,
+    //    format, type, textureDataPtr, textureId);
+
+    //if ( textureId != 0 )
+    //{
+    //    s_BmpTexture1Id = textureId;
+    //    NN_LOG("  Create texture. (id = %d)\n", textureId);
+    //}
+
+    //s_AppHeap.Free(textureDataPtr);
+}
+
+void DeleteTexture1(void)
+{        
+    //if ( s_BmpTexture1Id != 0 )
+    //{
+    //    bool flag = s_RenderSystem.DeleteTexture(s_BmpTexture1Id);
+    //    if ( flag )
+    //    {
+    //        NN_LOG("  Delete texture. (id = %d)\n", s_BmpTexture1Id);
+    //        s_BmpTexture1Id = 0;
+    //    }
+    //    else
+    //    {
+    //        NN_TPANIC_("Failed to delete texture. (id = %d)\n", s_BmpTexture1Id);            
+    //    }
+    //}
+}
+
+u8* GetTextureData(const wchar_t* bmpRomFilename, 
+                   u32& bmpWidth, u32& bmpHeight,
+                   u32& textureWidth, u32& textureHeight)
+{   
+    NN_LOG("\nReading data from ROMFS...\n");
+
+    nn::fs::FileReader file(bmpRomFilename);
+
+    size_t fileSize = file.GetSize();
+    NN_LOG("  fileSize = %d (Byte)\n", fileSize);
+    if ( fileSize == 0 )
+    {
+        NN_TPANIC_("Failed to open BMP file.\n");
+        return NULL;
+    }
+
+    void* buf = malloc( fileSize);
+
+    s32 readSize = file.Read(buf, fileSize);
+    NN_LOG("  file readSize = %d (Byte)\n", readSize);
+    if ( readSize == 0 )
+    {
+        NN_TPANIC_("Failed to open BMP file.\n");
+        return NULL;
+    }
+
+    u8* bmpDataBuffer = NULL;
+    bmpDataBuffer = GetBmpFileData((u8*)buf, bmpWidth, bmpHeight);
+    NN_LOG("  bmpWidth = %d, bmpHeight = %d\n", bmpWidth, bmpHeight);
+
+    u8* textureDataBuffer = NULL;
+    textureDataBuffer = GetTextureDataFromBmpFileData(bmpWidth, bmpHeight, bmpDataBuffer,
+        textureWidth, textureHeight);
+    NN_LOG("  textureWidth = %d, textureHeight = %d\n", textureWidth, textureHeight);
+
+    file.Finalize();
+    free(buf);
+
+    return textureDataBuffer;
+}
+
+u8* GetBmpFileData(u8* rawDataBuffer,
+                   u32& bmpWidth, u32& bmpHeight)
+{
+    BitmapInfoHeader* bmp_info_header_ptr = (BitmapInfoHeader*)(rawDataBuffer + sizeof(BitmapFileHeader));
+    bmpWidth = bmp_info_header_ptr->biWidth;
+    bmpHeight = bmp_info_header_ptr->biHeight;
+    u8* bmpDataBuffer = rawDataBuffer + sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader);
+
+    return bmpDataBuffer;
+}
+
+u8* GetTextureDataFromBmpFileData(const u32& bmpWidth, const u32& bmpHeight, u8* bmpDataBuffer, 
+                                  u32& textureWidth, u32& textureHeight)
+{
+    // Convert BMP to OpenGL RGB format
+    textureWidth = GetTextureLength(bmpWidth);
+    textureHeight = GetTextureLength(bmpHeight);
+    u8* textureGLDataBuffer = reinterpret_cast<u8*>( malloc(3 * textureWidth * textureHeight) );
+
+    for (u32 y = 0; y < textureHeight; y++)
+    {        
+        for (u32 x = 0; x < textureWidth; x++)
+        {
+            u8* textureDataPtr = textureGLDataBuffer;
+            textureDataPtr += 3 * ((static_cast<u32>(textureWidth) * y) + x);
+            if ( ( x >= bmpWidth ) || ( y >= bmpHeight ) )
+            {
+                (*textureDataPtr) = 0x00;
+                textureDataPtr += 1;
+
+                (*textureDataPtr) = 0x00;
+                textureDataPtr += 1;
+
+                (*textureDataPtr) = 0x00;
+            }
+            else
+            {
+                u8* bmpDataPtr = bmpDataBuffer;
+                bmpDataPtr += 3 * (bmpWidth * y + x);
+
+                (*textureDataPtr) = (*(bmpDataPtr + 2));
+                textureDataPtr += 1;
+                (*textureDataPtr) = (*(bmpDataPtr + 1));
+                textureDataPtr += 1;
+
+                (*textureDataPtr) = (*(bmpDataPtr + 0));
+            }
+        }
+    }
+
+    u8* textureDataBuffer = reinterpret_cast<u8*>( malloc(3 * textureWidth * textureHeight) );
+
+    // Convert OpenGL RGB format to PICA Native RGB format
+    GLenum format = GL_RGB_NATIVE_DMP;
+    bool result = demo::ConvertGLTextureToNative(
+        format, textureWidth, textureHeight,
+        textureGLDataBuffer, textureDataBuffer);
+    if ( result )
+    {
+        NN_LOG("  Conversion to GL_RGB_NATIVE_DMP succeeded.\n");
+    }
+    else
+    {
+        NN_TPANIC_("  Conversion to GL_RGB_NATIVE_DMP failed.\n");
+    }
+
+    free(textureGLDataBuffer);
+
+    return textureDataBuffer;
+}
+
+u32 GetTextureLength(const u32& imageLength)
+{        
+    u32 textureLength = 8;
+
+    // 8, 16, 32, 64, 128, 256, 512, 1024
+    for (u32 i = 0; i < 7; i++)
+    {
+        if ( imageLength > textureLength )
+        {
+            textureLength *= 2;
+        }
+        else
+        {
+            return textureLength;
+        }
+    }
+
+    return 1024;
 }

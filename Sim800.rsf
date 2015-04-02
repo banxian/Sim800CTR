@@ -3,6 +3,7 @@ BasicInfo:
   Title		: "sim800j"
   CompanyCode	: "00"
   ProductCode	: "CTR-P-SM8J"
+  MediaSize	: 128MB
 
 Rom:
   # Specifies the file root that is included in the ROM .
@@ -18,6 +19,8 @@ Rom:
 CardInfo:
   CardDevice: NorFlash
   MediaType: Card1
+  #CardDevice: None
+  #MediaType: Card2
 
 TitleInfo:
   UniqueId: 0x05B6D

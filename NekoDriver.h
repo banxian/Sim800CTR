@@ -22,6 +22,9 @@ private:
     char* fBROMBuffer;
     std::string fNorFilename;
     bool fFlashUpdated;
+#ifndef _WIN32
+    NN_PADDING3;
+#endif
 private:
     bool LoadBROM(const std::string& filename);
     bool LoadFullNorFlash(const std::string& filename);
@@ -59,6 +62,9 @@ protected:
     char* fBROMBuffer;
     char* fNorBuffer;
     bool fKeeping;
+#ifndef _WIN32
+    NN_PADDING3;
+#endif
     void* fLCDBuffer;
 #ifndef _WIN32
     nn::os::Thread fThread;
@@ -68,12 +74,14 @@ private:
     unsigned long long totalcycle;
     //const unsigned spdc1016freq = 3686400;
     bool measured;
+#ifndef _WIN32
+    NN_PADDING3;
+#endif
     unsigned remeasure;
     unsigned batchlimiter;
     long batchcount;
     double sleepgap;
     long sleepcount;
-
 // protected
 public:
     void run();
@@ -81,6 +89,9 @@ public:
 #ifdef AUTOTEST
 private:
     bool enablelogging;
+#ifndef _WIN32
+    NN_PADDING3;
+#endif
     void TryTest(unsigned line);
 #endif
 

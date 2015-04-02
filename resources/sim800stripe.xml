@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with TexturePacker http://texturepacker.com-->
+<!-- $TexturePacker:SmartUpdate:b7e90118b28d96ede4de7984e5fef194$ -->
+<!--Format:
+n  => name of the sprite
+x  => sprite x pos in texture
+y  => sprite y pos in texture
+w  => sprite width (may be trimmed)
+h  => sprite height (may be trimmed)
+oX => sprite's x-corner offset (only available if trimmed)
+oY => sprite's y-corner offset (only available if trimmed)
+oW => sprite's original width (only available if trimmed)
+oH => sprite's original height (only available if trimmed)
+r => 'y' only set if sprite is rotated
+-->
+<TextureAtlas imagePath="sim800stripe.png" width="512" height="256">
+    <sprite n="lcd_alarm" x="25" y="239" w="10" h="8"/>
+    <sprite n="lcd_battery" x="2" y="216" w="8" h="10"/>
+    <sprite n="lcd_caps" x="2" y="204" w="19" h="10"/>
+    <sprite n="lcd_down" x="29" y="196" w="4" h="6"/>
+    <sprite n="lcd_eng" x="2" y="192" w="19" h="10"/>
+    <sprite n="lcd_flash" x="48" y="246" w="7" h="8"/>
+    <sprite n="lcd_hbar" x="36" y="186" w="6" h="4"/>
+    <sprite n="lcd_hframe" x="22" y="216" w="30" h="8"/>
+    <sprite n="lcd_keyclick" x="2" y="228" w="6" h="10"/>
+    <sprite n="lcd_left" x="2" y="240" w="11" h="9"/>
+    <sprite n="lcd_line" x="29" y="166" w="10" h="7"/>
+    <sprite n="lcd_line5" x="23" y="178" w="10" h="7"/>
+    <sprite n="lcd_microphone" x="15" y="239" w="8" h="9"/>
+    <sprite n="lcd_minus" x="18" y="250" w="16" h="4"/>
+    <sprite n="lcd_num" x="8" y="166" w="19" h="10"/>
+    <sprite n="lcd_pgdown" x="12" y="216" w="8" h="9"/>
+    <sprite n="lcd_pgleft" x="45" y="226" w="9" h="8"/>
+    <sprite n="lcd_pgright" x="37" y="236" w="9" h="8"/>
+    <sprite n="lcd_pgup" x="48" y="236" w="7" h="8"/>
+    <sprite n="lcd_point" x="22" y="236" w="2" h="1"/>
+    <sprite n="lcd_right" x="10" y="228" w="10" h="9"/>
+    <sprite n="lcd_secret" x="23" y="205" w="10" h="6"/>
+    <sprite n="lcd_semicolon" x="33" y="187" w="1" h="6"/>
+    <sprite n="lcd_seven_honz1" x="35" y="182" w="6" h="2"/>
+    <sprite n="lcd_seven_honz2" x="10" y="251" w="6" h="2"/>
+    <sprite n="lcd_seven_honz3" x="2" y="251" w="6" h="2"/>
+    <sprite n="lcd_seven_vert1" x="35" y="195" w="2" h="5"/>
+    <sprite n="lcd_seven_vert2" x="45" y="166" w="2" h="5"/>
+    <sprite n="lcd_seven_vert3" x="42" y="173" w="2" h="5"/>
+    <sprite n="lcd_seven_vert4" x="41" y="166" w="2" h="5"/>
+    <sprite n="lcd_sharpbell" x="22" y="226" w="10" h="8"/>
+    <sprite n="lcd_shift" x="2" y="180" w="19" h="10"/>
+    <sprite n="lcd_sound" x="34" y="226" w="9" h="8"/>
+    <sprite n="lcd_speaker" x="23" y="187" w="8" h="7"/>
+    <sprite n="lcd_star" x="35" y="175" w="5" h="5"/>
+    <sprite n="lcd_tape" x="36" y="249" w="10" h="5"/>
+    <sprite n="lcd_up" x="23" y="196" w="4" h="7"/>
+    <sprite n="lcd_vbar" x="2" y="166" w="4" h="12"/>
+    <sprite n="lcd_vframe" x="388" y="2" w="9" h="132"/>
+    <sprite n="lcdpixel" x="43" y="180" w="2" h="2"/>
+    <sprite n="lcdshadow" x="2" y="2" w="384" h="162"/>
+</TextureAtlas>

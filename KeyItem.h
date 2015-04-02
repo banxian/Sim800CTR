@@ -26,6 +26,7 @@ private:
     int fColumn;
     bool fPressed;
     bool fHold;
+    NN_PADDING2;
     std::string fGraphic;
     std::string fSubscript;
     std::set<int> fMatchedKeycodes;

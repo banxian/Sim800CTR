@@ -37,6 +37,12 @@ bool TKeyItem::inRect( const QPoint& point )
     return fRect.contains(point);
 }
 
+void setRGB(demo::RenderSystemDrawing & render, unsigned rgb)
+{
+    render.SetColor((rgb >> 16) / 255.0, (rgb >> 8 & 0xFF)/ 255.0, (rgb & 0xFF)/ 255.0);
+
+}
+
 void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
 {
     if (fRect.isEmpty()) {
@@ -63,9 +69,9 @@ void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
     //framebrush.setColor(bgcolor);
     //painter.setBrush(framebrush);
     //painter.drawRoundedRect(fRect, 4, 4, Qt::AbsoluteSize);
-    //render.SetColor(bgcolor >> 16, bgcolor >> 8 & 0xFF, bgcolor & 0xFF);
-    //render.FillRectangle(fRect.x, fRect.y, fRect.w, fRect.h);
-    render.SetColor(framecolor >> 16, framecolor >> 8 & 0xFF, framecolor & 0xFF);
+    setRGB(render, bgcolor);
+    render.FillRectangle(fRect.x, fRect.y, fRect.w, fRect.h);
+    setRGB(render, framecolor);
     render.DrawLine(fRect.x, fRect.y, fRect.x + fRect.w, fRect.y);
     render.DrawLine(fRect.x, fRect.y + fRect.h, fRect.x + fRect.w, fRect.y + fRect.h);
     render.DrawLine(fRect.x, fRect.y, fRect.x, fRect.y + fRect.h);
@@ -82,7 +88,7 @@ void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
         //painter.setBrush(framebrush);
         //painter.drawPolygon(subbg);
     }
-    render.SetColor(1.0, 1.0, 1.0);
+    //render.SetColor(1.0, 1.0, 1.0); // white
     //painter.drawText(fRect, Qt::AlignCenter | Qt::AlignHCenter | Qt::TextWrapAnywhere, fGraphic);
     render.DrawText(fRect.x + 2, fRect.y + 2, "%s", fGraphic.c_str());
     if (fSubscript.empty() == false) {

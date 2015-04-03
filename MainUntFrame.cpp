@@ -22,7 +22,7 @@
 #include <string>
 #include "demo.h"
 
-#include "../Common/FsSampleCommon.h"
+#include "FsSampleCommon.h"
 #include "SaveDataExporter.h"
 #include "KeyItem.h"
 #include "NekoDriver.h"
@@ -38,35 +38,14 @@ extern "C" unsigned _ZN2nn2os37_GLOBAL__N__13_os_Memory_cpp_512daea910s_HeapSize
 
 extern void CheckLCDOffShift0AndEnableWatchDog();
 
-// Texture0
-GLuint s_BmpTexture0Id = 0;
-u32 s_Bmp0Width = 0;
-u32 s_Bmp0Height = 0;
-u32 s_Texture0Width = 0;
-u32 s_Texture0Height = 0;
-
-// Texture1
-GLuint s_BmpTexture1Id = 0;
-u32 s_Bmp1Width = 0;
-u32 s_Bmp1Height = 0;
-u32 s_Texture1Width = 0;
-u32 s_Texture1Height = 0;
-
-demo::RenderSystemDrawing& s_RenderSystem;
-
-void LoadTexture0(void);
-void DeleteTexture0(void);
-void LoadTexture1(void);
-void DeleteTexture1(void);
-u8* GetTextureData(const wchar_t* bmpRomFilename, 
-                   u32& bmpWidth, u32& bmpHeight, u32& textureWidth, u32& textureHeight);
-u8* GetBmpFileData(u8* rawDataBuffer, u32& bmpWidth, u32& bmpHeight);
-u8* GetTextureDataFromBmpFileData(const u32& bmpWidth, const u32& bmpHeight, u8* bmpDataBuffer, 
-                                  u32& textureWidth, u32& textureHeight);
-u32 GetTextureLength(const u32& imageLength);
-
+extern "C" unsigned char sim800stripe[];
 
 using namespace nn;
+
+typedef struct tagLCDStripe {
+    QRect bitmap;
+    int left, top;
+} TLCDStripe;
 
 namespace sample { namespace fs { namespace sim800ctr {
 
@@ -79,9 +58,15 @@ namespace
     nn::hid::TouchPanelReader m_TouchPanelReader;
     int fLastTouch;
     int fLastDownX, fLastDownY;
+    GLuint fStripeID;
+    TLCDStripe fLCDStripes[80];
+    QRect fLCDPixel, fLCDEmpty;
+    int attachindex = 0;
+    std::set<int> fFrontAttaches;
 } // namespace
 
 void initKeypad();
+void initLcdStripe();
 void repaintKeypad();
 void repaintKeypad(demo::RenderSystemDrawing &renderSystem);
 void repaintLCD(demo::RenderSystemDrawing &renderSystem);
@@ -158,6 +143,14 @@ void ProceedHid()
     if (padStatus.trigger == 0 && padStatus.release == 0) {
         return;
     }
+
+#ifdef NN_BUILD_VERBOSE
+    attachindex++;
+    if (attachindex >= 80) {
+        attachindex = 0;
+    }
+    screenlog(true, "%d\n", attachindex);
+#endif
 
     // trigger = all push event combine
     // release = all release event
@@ -263,7 +256,7 @@ void initKeypad()
         NULL,       // P07, P11
 
         new TKeyItem(50, "Help", nn::hid::BUTTON_R),  // P00, P12
-        new TKeyItem(51, "Shift", 0),   // P01, P12
+        new TKeyItem(51, "Shift", nn::hid::BUTTON_L),   // P01, P12
         new TKeyItem(52, "Caps", 0), // P02, P12
         new TKeyItem(53, "Esc", nn::hid::BUTTON_B),     // P03, P12
         new TKeyItem(54, "0", 0),           // P04, P12
@@ -278,7 +271,7 @@ void initKeypad()
         new TKeyItem(44, "B", 0),           // P04, P13
         new TKeyItem(45, "N", 0),           // P05, P13
         new TKeyItem(46, "M", 0),           // P06, P13
-        new TKeyItem(47, "PgUp", 0),   // P07, P13
+        new TKeyItem(47, "PgUp", nn::hid::BUTTON_ZL),   // P07, P13
 
         new TKeyItem(30, "A", 0),       // P00, P14
         new TKeyItem(31, "S", 0),       // P01, P14
@@ -304,7 +297,7 @@ void initKeypad()
         new TKeyItem(58, "Down", nn::hid::BUTTON_DOWN),     // P03, P16
         new TKeyItem(29, "P", 0),           // P04, P16
         new TKeyItem(39, "Enter", nn::hid::BUTTON_A),   // P05, P16
-        new TKeyItem(49, "PgDn", 0), // P06, P16
+        new TKeyItem(49, "PgDn", nn::hid::BUTTON_ZR), // P06, P16
         new TKeyItem(59, "Right", nn::hid::BUTTON_RIGHT),   // P07, P16
 
         NULL,       // P00, P17
@@ -429,14 +422,74 @@ void onKeypadSizeChanged(int w, int h)
     //repaintKeypad();
 }
 
+void FillTexturedRectangleEx(demo::RenderSystemDrawing &renderSystem, const GLuint textureId,
+                                                const f32 windowCoordinateX, const f32 windowCoordinateY,
+                                                const f32 rectangleWidth, const f32 rectangleHeight,
+                                                const f32 imageWidth, const f32 imageHeight,
+                                                const f32 textureX, const f32 textureY,
+                                                const f32 textureWidth, const f32 textureHeight)
+{
+    renderSystem.CheckRenderTarget();
+
+    if ( (textureId == 0 ) || (! renderSystem.HasTexture(textureId) ) )
+    {        
+        NN_TPANIC_("Invalid textureId %d.\n", textureId);
+        return;
+    }
+
+    f32 windowCoordinateX1 = windowCoordinateX + rectangleWidth;
+    f32 windowCoordinateY1 = windowCoordinateY + rectangleHeight;
+
+    f32 texcoordS0 = textureX / textureWidth;
+    f32 texcoordT0 = textureY / textureHeight;
+    f32 texcoordS1 = texcoordS0 + static_cast<f32>(imageWidth) / static_cast<f32>(textureWidth);
+    f32 texcoordT1 = texcoordT0 + static_cast<f32>(imageHeight) / static_cast<f32>(textureHeight);
+
+    renderSystem.FillTexturedTriangle(textureId,
+        windowCoordinateX, windowCoordinateY,
+        texcoordS0, texcoordT1,
+        windowCoordinateX, windowCoordinateY1,
+        texcoordS0, texcoordT0,
+        windowCoordinateX1, windowCoordinateY1,
+        texcoordS1, texcoordT0);
+
+    renderSystem.FillTexturedTriangle(textureId,
+        windowCoordinateX, windowCoordinateY,
+        texcoordS0, texcoordT1,
+        windowCoordinateX1, windowCoordinateY1,
+        texcoordS1, texcoordT0,
+        windowCoordinateX1, windowCoordinateY,
+        texcoordS1, texcoordT1);
+}
+
+
 void repaintLCD( demo::RenderSystemDrawing &renderSystem )
 {
+#ifdef NN_BUILD_VERBOSE
+    renderSystem.SetColor(0.8, 0.4, 0.2); // red
+    renderSystem.DrawLine(0,0,0,240);
+    renderSystem.DrawLine(0,162,400,162);
+#endif
     // Draw empty
     if (lcdoffshift0flag) {
         //painter.setOpacity(0.8);
         //painter.fillRect(via.rect(), QColor(0xFFFFFDE8));
+        //FillTexturedRectangleEx(renderSystem, fStripeID, 0, 0, 384, 162, 384, 162, 2, 92, 512, 256);
+        renderSystem.SetColor(1, 0.9921, 0.9098, 0.1);
+        renderSystem.FillRectangle(0,0,384,162);
+        //DrawShadowOrPixel(&renderLCDBuffer, renderSystem, false);
     } else {
+        // s_RenderSystem.FillTexturedRectangle(s_BmpTexture0Id,
+        //windowCoordinateX, windowCoordinateY,
+         //   rectangleWidth, rectangleHeight,
+         //   s_Bmp0Width, s_Bmp0Height,
+         //   s_Texture0Width, s_Texture0Height);
+        //renderSystem.FillTexturedRectangle(fStripeID, 0, 0, 384, 162, 384, 162, 20, 40, 512, 256);
+        FillTexturedRectangleEx(renderSystem, fStripeID, 0, 0, 384, 162, 384, 162, 2, 92, 512, 256);
+        //renderSystem.SetColor(1, 0.9921, 0.9098);
+        //renderSystem.FillRectangle(0,0,384,162);
         //DrawShadowOrPixel(buffer, painter, true);
+        //DrawShadowOrPixel(&renderLCDBuffer, renderSystem, true);
         DrawShadowOrPixel(&renderLCDBuffer, renderSystem, false);
     }
 
@@ -444,29 +497,43 @@ void repaintLCD( demo::RenderSystemDrawing &renderSystem )
 
 void DrawShadowOrPixel( TScreenBuffer* buffer, demo::RenderSystemDrawing &render, bool semishadow )
 {
+    int offx = 0;
+    int offy = 0;
     if (semishadow) {
-        //painter.setOpacity(0.2);
-        //QTransform shadow;
-        //shadow.translate(2, 2);
-        //painter.setTransform(shadow, true);
+        offx = 2;
+        offy = 2;
+        render.SetColor(50/255.0, 40/255.0, 74/255.0, 0.3);
     } else {
-        //painter.resetTransform();
-        //painter.setOpacity(1);
+        render.SetColor(50/255.0, 40/255.0, 74/255.0);
     }
-    for (int y = 79; y >= 0; y--)
-    {
-        char pixel = buffer->fPixel[(160/8) * y];
-        if (pixel < 0) {
-            //TLCDStripe* item = &fLCDStripes[y];
-            ////painter.drawImage(QRect(item->left * 2 - 2, item->top * 2 - 2, item->bitmap.width(), item->bitmap.height()), item->bitmap);
-            //painter.drawImage(QRect(item->left, item->top, item->bitmap.width(), item->bitmap.height()), item->bitmap);
+    render.SetPointSize(2);
+    if (semishadow == false) {
+        // TODO: optmize by software merge
+        for (int y = 79; y >= 0; y--) {
+            if (fFrontAttaches.find(y) == fFrontAttaches.end()) {
+                //continue;
+                char pixel = buffer->fPixel[(160/8) * y];
+                if ((pixel < 0)) {
+                    TLCDStripe* item = &fLCDStripes[y];
+                    FillTexturedRectangleEx(render, fStripeID, item->left, item->top, item->bitmap.w, item->bitmap.h, item->bitmap.w, item->bitmap.h, item->bitmap.x, 256 - item->bitmap.y - item->bitmap.h, 512, 256);
+                }
+            }
+        }
+        for (int y = 79; y >= 0; y--) {
+            if (fFrontAttaches.find(y) != fFrontAttaches.end()) {
+                char pixel = buffer->fPixel[(160/8) * y];
+                if ((pixel < 0)) {
+                    TLCDStripe* item = &fLCDStripes[y];
+                    FillTexturedRectangleEx(render, fStripeID, item->left, item->top, item->bitmap.w, item->bitmap.h, item->bitmap.w, item->bitmap.h, item->bitmap.x, 256 - item->bitmap.y - item->bitmap.h, 512, 256);
+                }
+            }
         }
     }
 
     int index = 0;
-    int yp = 1;
+    int yp = 1 + offy;
     for (int y = 0; y < 80; y++) {
-        int xp = 47 - 2 - 2;
+        int xp = 47 - 2 - 2 + offx;
         for (int i = 0; i < 160 / 8; i++) {
             const unsigned char pixel = buffer->fPixel[index];
             // try to shrink jump cost
@@ -503,6 +570,332 @@ void DrawShadowOrPixel( TScreenBuffer* buffer, demo::RenderSystemDrawing &render
     }
 }
 
+void initLcdStripe()
+{
+    QRect PageUp = QRect(48, 236, 7, 8); // lcd_pgup.png
+    QRect Star = QRect(35, 175, 5, 5); // lcd_star.png
+    QRect Num = QRect(8, 166, 19, 10); // lcd_num.png
+    QRect Eng = QRect(2, 192, 19, 10); // lcd_eng.png
+    QRect Caps = QRect(2, 204, 19, 10); // lcd_caps.png
+    QRect Shift = QRect(2, 180, 19, 10); // lcd_shift.png
+    QRect Sound = QRect(34, 226, 9, 8); // lcd_sound.png
+    QRect Flash = QRect(48, 246, 7, 8); // lcd_flash.png
+    QRect SharpBell = QRect(22, 226, 10, 8); // lcd_sharpbell.png
+    QRect KeyClick = QRect(2, 228, 6, 10); // lcd_keyclick.png
+    QRect Alarm = QRect(25, 239, 10, 8); // lcd_alarm.png
+    QRect Speaker = QRect(23, 187, 8, 7); // lcd_speaker.png
+    QRect Tape = QRect(36, 249, 10, 5); // lcd_tape.png
+    QRect Minus = QRect(18, 250, 16, 4); // lcd_minus.png
+    QRect Battery = QRect(2, 216, 8, 10); // lcd_battery.png
+    QRect Secret = QRect(23, 205, 10, 6); // lcd_secret.png
+    QRect PageLeft = QRect(45, 226, 9, 8); // lcd_pgleft.png
+    QRect PageRight = QRect(37, 236, 9, 8); // lcd_pgright.png
+    QRect PageDown = QRect(12, 216, 8, 9); // lcd_pgdown.png
+    QRect Left = QRect(2, 240, 11, 9); // lcd_left.png
+    QRect HonzFrame = QRect(22, 216, 30, 8); // lcd_hframe.png
+    QRect Microphone = QRect(15, 239, 8, 9); // lcd_microphone.png
+    QRect HonzBar = QRect(36, 186, 6, 4); // lcd_hbar.png
+    QRect Right = QRect(10, 228, 10, 9); // lcd_right.png
+    QRect SevenVert1 = QRect(35, 195, 2, 5); // lcd_seven_vert1.png
+    QRect SevenVert2 = QRect(45, 166, 2, 5); // lcd_seven_vert2.png
+    QRect SevenVert3 = QRect(42, 173, 2, 5); // lcd_seven_vert3.png
+    QRect SevenVert4 = QRect(41, 166, 2, 5); // lcd_seven_vert4.png
+    QRect SevenHonz1 = QRect(35, 182, 6, 2); // lcd_seven_honz1.png
+    QRect SevenHonz2 = QRect(10, 251, 6, 2); // lcd_seven_honz2.png
+    QRect SevenHonz3 = QRect(2, 251, 6, 2); // lcd_seven_honz3.png
+    QRect VertFrame = QRect(388, 2, 9, 132); // lcd_vframe.png
+    QRect Up = QRect(23, 196, 4, 7); // lcd_up.png
+    QRect Down = QRect(29, 196, 4, 6); // lcd_down.png
+    QRect Line = QRect(29, 166, 10, 7); // lcd_line.png
+    QRect Line5 = QRect(23, 178, 10, 7); // lcd_line5.png
+    QRect VertBar = QRect(2, 166, 4, 12); // lcd_vbar.png
+    QRect SemiColon = QRect(33, 187, 1, 6); // lcd_semicolon.png
+    QRect Point = QRect(22, 236, 2, 1); // lcd_point.png
+    fLCDPixel = QRect(43,180,2,2);
+    fLCDEmpty = QRect(2,2,384,162);
+
+    //fLCDStripes = new TLCDStripe[80];
+
+    // 7 segment display
+    fLCDStripes[2].bitmap = SevenVert1;
+    fLCDStripes[19].bitmap = SevenVert2;
+    fLCDStripes[0].bitmap = SevenVert3;
+    fLCDStripes[22].bitmap = SevenVert4;
+    fLCDStripes[1].bitmap = SevenHonz1;
+    fLCDStripes[3].bitmap = SevenHonz2;
+    fLCDStripes[21].bitmap = SevenHonz3;
+    int xdelta = 8;
+    fLCDStripes[2].left  = 6;
+    fLCDStripes[2].top   = 1;
+    fLCDStripes[33].left = 6;
+    fLCDStripes[33].top  = 6;
+    fLCDStripes[0].left  = 2;
+    fLCDStripes[0].top   = 1;
+    fLCDStripes[35].left = 2;
+    fLCDStripes[35].top  = 6;
+    fLCDStripes[1].left  = 2;
+    fLCDStripes[1].top   = 1;
+    fLCDStripes[3].left  = 2;
+    fLCDStripes[3].top   = 5;
+    fLCDStripes[34].left = 2;
+    fLCDStripes[34].top  = 9;
+
+    fLCDStripes[7].bitmap = SevenVert1;
+    fLCDStripes[24].bitmap = SevenVert2;
+    fLCDStripes[5].bitmap = SevenVert3;
+    fLCDStripes[26].bitmap = SevenVert4;
+    fLCDStripes[6].bitmap = SevenHonz1;
+    fLCDStripes[8].bitmap = SevenHonz2;
+    fLCDStripes[25].bitmap = SevenHonz3;
+    fLCDStripes[7].left  = fLCDStripes[2].left + xdelta;
+    fLCDStripes[7].top   = fLCDStripes[2].top;
+    fLCDStripes[29].left = fLCDStripes[33].left + xdelta;
+    fLCDStripes[29].top  = fLCDStripes[33].top;
+    fLCDStripes[5].left  = fLCDStripes[0].left + xdelta;
+    fLCDStripes[5].top   = fLCDStripes[0].top;
+    fLCDStripes[31].left = fLCDStripes[35].left + xdelta;
+    fLCDStripes[31].top  = fLCDStripes[35].top;
+    fLCDStripes[6].left  = fLCDStripes[1].left + xdelta;
+    fLCDStripes[6].top   = fLCDStripes[1].top;
+    fLCDStripes[8].left  = fLCDStripes[3].left + xdelta;
+    fLCDStripes[8].top   = fLCDStripes[3].top;
+    fLCDStripes[30].left = fLCDStripes[34].left + xdelta;
+    fLCDStripes[30].top  = fLCDStripes[34].top;
+
+    fLCDStripes[13].bitmap = SevenVert1;
+    fLCDStripes[29].bitmap = SevenVert2;
+    fLCDStripes[10].bitmap = SevenVert3;
+    fLCDStripes[31].bitmap = SevenVert4;
+    fLCDStripes[11].bitmap = SevenHonz1;
+    fLCDStripes[14].bitmap = SevenHonz2;
+    fLCDStripes[30].bitmap = SevenHonz3;
+    xdelta += 1;
+    fLCDStripes[13].left = fLCDStripes[7].left  + xdelta;
+    fLCDStripes[13].top  = fLCDStripes[7].top;
+    fLCDStripes[24].left = fLCDStripes[29].left + xdelta;
+    fLCDStripes[24].top  = fLCDStripes[29].top;
+    fLCDStripes[10].left = fLCDStripes[5].left  + xdelta;
+    fLCDStripes[10].top  = fLCDStripes[5].top;
+    fLCDStripes[26].left = fLCDStripes[31].left + xdelta;
+    fLCDStripes[26].top  = fLCDStripes[31].top;
+    fLCDStripes[11].left = fLCDStripes[6].left  + xdelta;
+    fLCDStripes[11].top  = fLCDStripes[6].top;
+    fLCDStripes[14].left = fLCDStripes[8].left  + xdelta;
+    fLCDStripes[14].top  = fLCDStripes[8].top;
+    fLCDStripes[25].left = fLCDStripes[30].left + xdelta;
+    fLCDStripes[25].top  = fLCDStripes[30].top;
+    xdelta -= 1;
+
+    fLCDStripes[17].bitmap = SevenVert1;
+    fLCDStripes[33].bitmap = SevenVert2;
+    fLCDStripes[15].bitmap = SevenVert3;
+    fLCDStripes[35].bitmap = SevenVert4;
+    fLCDStripes[16].bitmap = SevenHonz1;
+    fLCDStripes[18].bitmap = SevenHonz2;
+    fLCDStripes[34].bitmap = SevenHonz3;
+    fLCDStripes[17].left = fLCDStripes[13].left + xdelta;
+    fLCDStripes[17].top  = fLCDStripes[13].top;
+    fLCDStripes[19].left = fLCDStripes[24].left + xdelta;
+    fLCDStripes[19].top  = fLCDStripes[24].top;
+    fLCDStripes[15].left = fLCDStripes[10].left + xdelta;
+    fLCDStripes[15].top  = fLCDStripes[10].top;
+    fLCDStripes[22].left = fLCDStripes[26].left + xdelta;
+    fLCDStripes[22].top  = fLCDStripes[26].top;
+    fLCDStripes[16].left = fLCDStripes[11].left + xdelta;
+    fLCDStripes[16].top  = fLCDStripes[11].top;
+    fLCDStripes[18].left = fLCDStripes[14].left + xdelta;
+    fLCDStripes[18].top  = fLCDStripes[14].top;
+    fLCDStripes[21].left = fLCDStripes[25].left + xdelta;
+    fLCDStripes[21].top  = fLCDStripes[25].top;
+
+    fLCDStripes[32].bitmap = Point;
+    fLCDStripes[32].left = 8;
+    fLCDStripes[32].top = 12;
+    fLCDStripes[9].bitmap = SemiColon;
+    fLCDStripes[9].left = 17;
+    fLCDStripes[9].top = 3;
+    fLCDStripes[27].bitmap = Point; // TODO: Point2
+    fLCDStripes[27].left = 33 / 2;
+    fLCDStripes[27].top = 12;
+    fLCDStripes[23].bitmap = Point;
+    fLCDStripes[23].left = 51 / 2;
+    fLCDStripes[23].top = 12;
+
+    // right lines
+    fLCDStripes[4].bitmap = Line;
+    fLCDStripes[12].bitmap = Line5;
+    fLCDStripes[20].bitmap = Line;
+    fLCDStripes[28].bitmap = Line5;
+    fLCDStripes[36].bitmap = Line;
+    fLCDStripes[44].bitmap = Line5;
+    fLCDStripes[52].bitmap = Line;
+    fLCDStripes[60].bitmap = Line5;
+    fLCDStripes[68].bitmap = Line;
+    fLCDStripes[70].bitmap = Right;
+    fLCDStripes[74].bitmap = Line;
+    fLCDStripes[4].left = 371;
+    fLCDStripes[4].top = 1;
+    fLCDStripes[12].left = 371;
+    fLCDStripes[12].top = 17;
+    fLCDStripes[20].left = 371;
+    fLCDStripes[20].top = 67 / 2;
+    fLCDStripes[28].left = 371;
+    fLCDStripes[28].top = 99 / 2;
+    fLCDStripes[36].left = 371;
+    fLCDStripes[36].top = 66;
+    fLCDStripes[44].left = 371;
+    fLCDStripes[44].top = 82;
+    fLCDStripes[52].left = 371;
+    fLCDStripes[52].top = 197 / 2;
+    fLCDStripes[60].left = 371;
+    fLCDStripes[60].top = 229 / 2;
+    fLCDStripes[68].left = 371;
+    fLCDStripes[68].top = 261 / 2;
+    fLCDStripes[70].left = 371;
+    fLCDStripes[70].top = 140;
+    fLCDStripes[74].left = 371;
+    fLCDStripes[74].top = 153;
+
+
+    fLCDStripes[38].bitmap = PageUp;
+    fLCDStripes[38].left = 14;
+    fLCDStripes[38].top = 18;
+    fLCDStripes[37].bitmap = Star;
+    fLCDStripes[37].left = 23;
+    fLCDStripes[37].top = 21;
+    fLCDStripes[39].bitmap = Num;
+    fLCDStripes[39].left = 12;
+    fLCDStripes[39].top = 28;
+    fLCDStripes[40].bitmap = Eng;
+    fLCDStripes[40].left = 12;
+    fLCDStripes[40].top = 77 / 2;
+    fLCDStripes[41].bitmap = Caps;
+    fLCDStripes[41].left = 12;
+    fLCDStripes[41].top = 99 / 2;
+    fLCDStripes[42].bitmap = Shift;
+    fLCDStripes[42].left = 12;
+    fLCDStripes[42].top = 60;
+    fLCDStripes[46].bitmap = Flash;
+    fLCDStripes[46].left = 47 / 2;
+    fLCDStripes[46].top = 145 / 2;
+    fLCDStripes[47].bitmap = Sound;
+    fLCDStripes[47].left = 12;
+    fLCDStripes[47].top = 147 / 2;
+    fLCDStripes[48].bitmap = KeyClick;
+    fLCDStripes[48].left = 25;
+    fLCDStripes[48].top = 82;
+    fLCDStripes[51].bitmap = SharpBell;
+    fLCDStripes[51].left = 12;
+    fLCDStripes[51].top = 83;
+    fLCDStripes[50].bitmap = Speaker;
+    fLCDStripes[50].left = 24;
+    fLCDStripes[50].top = 93;
+    fLCDStripes[49].bitmap = Alarm;
+    fLCDStripes[49].left = 12;
+    fLCDStripes[49].top = 93;
+    fLCDStripes[53].bitmap = Microphone;
+    fLCDStripes[53].left = 23;
+    fLCDStripes[53].top = 102;
+    fLCDStripes[54].bitmap = Tape;
+    fLCDStripes[54].left = 12;
+    fLCDStripes[54].top = 207 / 2;
+    fLCDStripes[55].bitmap = Minus;
+    fLCDStripes[55].left = 24;
+    fLCDStripes[55].top = 113;
+    fLCDStripes[58].bitmap = Battery;
+    fLCDStripes[58].left = 12;
+    fLCDStripes[58].top = 118;
+    fLCDStripes[59].bitmap = Secret;
+    fLCDStripes[59].left = 22;
+    fLCDStripes[59].top = 120;
+    fLCDStripes[61].bitmap = PageLeft;
+    fLCDStripes[61].left = 12;
+    fLCDStripes[61].top = 261 / 2;
+    fLCDStripes[62].bitmap = PageRight;
+    fLCDStripes[62].left = 23;
+    fLCDStripes[62].top = 261 / 2;
+    fLCDStripes[63].bitmap = Left;
+    fLCDStripes[63].left = 23;
+    fLCDStripes[63].top = 140;
+    fLCDStripes[64].bitmap = PageDown;
+    fLCDStripes[64].left = 12;
+    fLCDStripes[64].top = 141;
+
+    // vertframe
+    fLCDStripes[65].bitmap = VertFrame;
+    fLCDStripes[65].left = 2;
+    fLCDStripes[65].top = 18;
+    fLCDStripes[79].bitmap = Up;
+    fLCDStripes[79].left = 4;
+    fLCDStripes[79].top = 20;
+    fLCDStripes[43].bitmap = VertBar;
+    fLCDStripes[43].left = 4;
+    fLCDStripes[43].top = 31;
+    fLCDStripes[45].bitmap = VertBar;
+    fLCDStripes[45].left = 4;
+    fLCDStripes[45].top = 43;
+    fLCDStripes[56].bitmap = VertBar;
+    fLCDStripes[56].left = 4;
+    fLCDStripes[56].top = 55;
+    fLCDStripes[78].bitmap = VertBar;
+    fLCDStripes[78].left = 4;
+    fLCDStripes[78].top = 67;
+    fLCDStripes[77].bitmap = VertBar;
+    fLCDStripes[77].left = 4;
+    fLCDStripes[77].top = 79;
+    fLCDStripes[57].bitmap = VertBar;
+    fLCDStripes[57].left = 4;
+    fLCDStripes[57].top = 91;
+    fLCDStripes[76].bitmap = VertBar;
+    fLCDStripes[76].left = 4;
+    fLCDStripes[76].top = 103;
+    fLCDStripes[75].bitmap = VertBar;
+    fLCDStripes[75].left = 4;
+    fLCDStripes[75].top = 115;
+    fLCDStripes[73].bitmap = VertBar;
+    fLCDStripes[73].left = 4;
+    fLCDStripes[73].top = 127;
+    fLCDStripes[66].bitmap = Down;
+    fLCDStripes[66].left = 4;
+    fLCDStripes[66].top = 142;
+    fLCDStripes[72].bitmap = HonzFrame;
+    fLCDStripes[72].left = 2;
+    fLCDStripes[72].top = 153;
+    fLCDStripes[67].bitmap = HonzBar;
+    fLCDStripes[67].left = 9;
+    fLCDStripes[67].top = 155;
+    fLCDStripes[69].bitmap = HonzBar;
+    fLCDStripes[69].left = 29 / 2;
+    fLCDStripes[69].top = 155;
+    fLCDStripes[71].bitmap = HonzBar;
+    fLCDStripes[71].left = 20;
+    fLCDStripes[71].top = 155;
+
+    fFrontAttaches.insert(43);
+    fFrontAttaches.insert(45);
+    fFrontAttaches.insert(56);
+    fFrontAttaches.insert(78);
+    fFrontAttaches.insert(77);
+    fFrontAttaches.insert(57);
+    fFrontAttaches.insert(76);
+    fFrontAttaches.insert(75);
+    fFrontAttaches.insert(73);
+
+    fFrontAttaches.insert(67);
+    fFrontAttaches.insert(69);
+    fFrontAttaches.insert(71);
+
+    fFrontAttaches.insert(79);
+    fFrontAttaches.insert(66);
+
+    for (int i = 0; i < 79; i++)
+    {
+        if (memcmp(&fLCDStripes[i].bitmap, &SevenVert1, sizeof(QRect)) == 0 || memcmp(&fLCDStripes[i].bitmap, &SevenVert2, sizeof(QRect)) == 0 || memcmp(&fLCDStripes[i].bitmap, &SevenVert3, sizeof(QRect)) == 0 || memcmp(&fLCDStripes[i].bitmap, &SevenVert4, sizeof(QRect)) == 0) {
+            fFrontAttaches.insert(i);
+        }
+    }
+}
+
 } // namespace sim800ctr
 
 using namespace sim800ctr;
@@ -533,8 +926,20 @@ void Initialize(demo::RenderSystemDrawing& render)
     nn::fnd::DateTime now = nn::fnd::DateTime::GetNow();
     hardlog("=============================\n%d/%d/%d %02d:%02d:%02d\n", now.GetYear(), now.GetMonth(), now.GetDay(), now.GetHour(), now.GetMinute(), now.GetSecond());
 
-    s_RenderSystem = render;
-    LoadTexture0();
+    //glBindTexture(GL_TEXTURE_2D, s_TextureAlpha);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, g_TexAlpha);
+    //glBindTexture(GL_TEXTURE_2D, textureId);
+    //glTexImage2D(target, 0, internalFormat,
+    //    width, height, 0,
+    //    format, type, pixels);
+
+    hardlog("GenerateTexture\n");
+    render.GenerateTexture(GL_TEXTURE_2D,
+        GL_RGBA, 512, 256,
+        GL_RGBA, GL_UNSIGNED_BYTE, sim800stripe, fStripeID);
+    //LoadTexture0();
+
+    initLcdStripe();
 
     hardlog("initKeypad\n");
     initKeypad();
@@ -559,7 +964,7 @@ void Initialize(demo::RenderSystemDrawing& render)
 }
 
 // Call from Demo.
-void Finalize()
+void Finalize(demo::RenderSystemDrawing &render)
 {
     //s_IsWorkerThreadAlive = false;
     //s_WorkerEvent.Signal();
@@ -573,7 +978,7 @@ void Finalize()
     nn::fs::Unmount("rom:");
     nn::fs::Unmount("sdmc:");
 
-    DeleteTexture0();
+    render.DeleteTexture(fStripeID);
 }
 
 }} // namespace sample::fs
@@ -596,252 +1001,3 @@ extern "C" void nninitStartUp(void)
     _ZN2nn3dbg22SetDefaultBreakHandlerEv();
 }
 
-typedef __packed struct BitmapFileHeader
-{
-    u8 bfType[2];
-    u16 bfSize[2];
-    u16 bfReserved1;
-    u16 bfReserved2;
-    u16 bfOffBits[2];
-} BitmapFileHeader;
-
-typedef __packed struct BitmapInfoHeader
-{
-    u32 biSize;
-    s32 biWidth;
-    s32 biHeight;
-    u16 biPlanes;
-    u16 biBitCount;
-    u32 biCompression;
-    u32 biSizeImage;
-    s32 biXPixPerMeter;
-    s32 biYPixPerMeter;
-    u32 biClrUsed;
-    u32 biClrImportant;
-} BitmapInfoHeader;
-
-void LoadTexture0(void)
-{
-    if ( s_BmpTexture0Id != 0 )
-    {
-        DeleteTexture0();
-    }
-
-    wchar_t* bmpRomFilename = L"rom:/sim800stripe.bmp";
-    u8* textureDataPtr = GetTextureData(bmpRomFilename, 
-        s_Bmp0Width, s_Bmp0Height, s_Texture0Width, s_Texture0Height);
-
-    GLenum target = GL_TEXTURE_2D;
-    GLenum internalFormat = GL_RGB_NATIVE_DMP; 
-    GLenum format = GL_RGB_NATIVE_DMP;
-    GLenum type = GL_UNSIGNED_BYTE;
-    GLuint textureId = 0;
-
-    s_RenderSystem.GenerateTexture(target,
-        internalFormat, s_Texture0Width, s_Texture0Height,
-        format, type, textureDataPtr, textureId);
-
-    if ( textureId != 0 )
-    {
-        s_BmpTexture0Id = textureId;
-        NN_LOG("  Create texture (id = %d)\n", textureId);
-    }
-
-    free(textureDataPtr);
-}
-
-void DeleteTexture0(void)
-{        
-    if ( s_BmpTexture0Id != 0 )
-    {
-        bool flag = s_RenderSystem.DeleteTexture(s_BmpTexture0Id);
-        if ( flag )
-        {
-            NN_LOG("  Delete texture. (id = %d)\n", s_BmpTexture0Id);
-            s_BmpTexture0Id = 0;
-        }
-        else
-        {
-            NN_TPANIC_("  Failed to delete texture. (id = %d)\n", s_BmpTexture0Id);            
-        }
-    }
-}
-
-void LoadTexture1(void)
-{
-    //if ( s_BmpTexture1Id != 0 )
-    //{
-    //    DeleteTexture1();
-    //}
-
-    //wchar_t* bmpRomFilename = L"rom:/dandelion.bmp";
-    //u8* textureDataPtr = GetTextureData(bmpRomFilename, 
-    //    s_Bmp1Width, s_Bmp1Height, s_Texture1Width, s_Texture1Height);
-
-    //GLenum target = GL_TEXTURE_2D;
-    //GLenum internalFormat = GL_RGB_NATIVE_DMP; 
-    //GLenum format = GL_RGB_NATIVE_DMP;
-    //GLenum type = GL_UNSIGNED_BYTE;
-    //GLuint textureId = 0;
-
-    //s_RenderSystem.GenerateTexture(target,
-    //    internalFormat, s_Texture1Width, s_Texture1Height,
-    //    format, type, textureDataPtr, textureId);
-
-    //if ( textureId != 0 )
-    //{
-    //    s_BmpTexture1Id = textureId;
-    //    NN_LOG("  Create texture. (id = %d)\n", textureId);
-    //}
-
-    //s_AppHeap.Free(textureDataPtr);
-}
-
-void DeleteTexture1(void)
-{        
-    //if ( s_BmpTexture1Id != 0 )
-    //{
-    //    bool flag = s_RenderSystem.DeleteTexture(s_BmpTexture1Id);
-    //    if ( flag )
-    //    {
-    //        NN_LOG("  Delete texture. (id = %d)\n", s_BmpTexture1Id);
-    //        s_BmpTexture1Id = 0;
-    //    }
-    //    else
-    //    {
-    //        NN_TPANIC_("Failed to delete texture. (id = %d)\n", s_BmpTexture1Id);            
-    //    }
-    //}
-}
-
-u8* GetTextureData(const wchar_t* bmpRomFilename, 
-                   u32& bmpWidth, u32& bmpHeight,
-                   u32& textureWidth, u32& textureHeight)
-{   
-    NN_LOG("\nReading data from ROMFS...\n");
-
-    nn::fs::FileReader file(bmpRomFilename);
-
-    size_t fileSize = file.GetSize();
-    NN_LOG("  fileSize = %d (Byte)\n", fileSize);
-    if ( fileSize == 0 )
-    {
-        NN_TPANIC_("Failed to open BMP file.\n");
-        return NULL;
-    }
-
-    void* buf = malloc( fileSize);
-
-    s32 readSize = file.Read(buf, fileSize);
-    NN_LOG("  file readSize = %d (Byte)\n", readSize);
-    if ( readSize == 0 )
-    {
-        NN_TPANIC_("Failed to open BMP file.\n");
-        return NULL;
-    }
-
-    u8* bmpDataBuffer = NULL;
-    bmpDataBuffer = GetBmpFileData((u8*)buf, bmpWidth, bmpHeight);
-    NN_LOG("  bmpWidth = %d, bmpHeight = %d\n", bmpWidth, bmpHeight);
-
-    u8* textureDataBuffer = NULL;
-    textureDataBuffer = GetTextureDataFromBmpFileData(bmpWidth, bmpHeight, bmpDataBuffer,
-        textureWidth, textureHeight);
-    NN_LOG("  textureWidth = %d, textureHeight = %d\n", textureWidth, textureHeight);
-
-    file.Finalize();
-    free(buf);
-
-    return textureDataBuffer;
-}
-
-u8* GetBmpFileData(u8* rawDataBuffer,
-                   u32& bmpWidth, u32& bmpHeight)
-{
-    BitmapInfoHeader* bmp_info_header_ptr = (BitmapInfoHeader*)(rawDataBuffer + sizeof(BitmapFileHeader));
-    bmpWidth = bmp_info_header_ptr->biWidth;
-    bmpHeight = bmp_info_header_ptr->biHeight;
-    u8* bmpDataBuffer = rawDataBuffer + sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader);
-
-    return bmpDataBuffer;
-}
-
-u8* GetTextureDataFromBmpFileData(const u32& bmpWidth, const u32& bmpHeight, u8* bmpDataBuffer, 
-                                  u32& textureWidth, u32& textureHeight)
-{
-    // Convert BMP to OpenGL RGB format
-    textureWidth = GetTextureLength(bmpWidth);
-    textureHeight = GetTextureLength(bmpHeight);
-    u8* textureGLDataBuffer = reinterpret_cast<u8*>( malloc(3 * textureWidth * textureHeight) );
-
-    for (u32 y = 0; y < textureHeight; y++)
-    {        
-        for (u32 x = 0; x < textureWidth; x++)
-        {
-            u8* textureDataPtr = textureGLDataBuffer;
-            textureDataPtr += 3 * ((static_cast<u32>(textureWidth) * y) + x);
-            if ( ( x >= bmpWidth ) || ( y >= bmpHeight ) )
-            {
-                (*textureDataPtr) = 0x00;
-                textureDataPtr += 1;
-
-                (*textureDataPtr) = 0x00;
-                textureDataPtr += 1;
-
-                (*textureDataPtr) = 0x00;
-            }
-            else
-            {
-                u8* bmpDataPtr = bmpDataBuffer;
-                bmpDataPtr += 3 * (bmpWidth * y + x);
-
-                (*textureDataPtr) = (*(bmpDataPtr + 2));
-                textureDataPtr += 1;
-                (*textureDataPtr) = (*(bmpDataPtr + 1));
-                textureDataPtr += 1;
-
-                (*textureDataPtr) = (*(bmpDataPtr + 0));
-            }
-        }
-    }
-
-    u8* textureDataBuffer = reinterpret_cast<u8*>( malloc(3 * textureWidth * textureHeight) );
-
-    // Convert OpenGL RGB format to PICA Native RGB format
-    GLenum format = GL_RGB_NATIVE_DMP;
-    bool result = demo::ConvertGLTextureToNative(
-        format, textureWidth, textureHeight,
-        textureGLDataBuffer, textureDataBuffer);
-    if ( result )
-    {
-        NN_LOG("  Conversion to GL_RGB_NATIVE_DMP succeeded.\n");
-    }
-    else
-    {
-        NN_TPANIC_("  Conversion to GL_RGB_NATIVE_DMP failed.\n");
-    }
-
-    free(textureGLDataBuffer);
-
-    return textureDataBuffer;
-}
-
-u32 GetTextureLength(const u32& imageLength)
-{        
-    u32 textureLength = 8;
-
-    // 8, 16, 32, 64, 128, 256, 512, 1024
-    for (u32 i = 0; i < 7; i++)
-    {
-        if ( imageLength > textureLength )
-        {
-            textureLength *= 2;
-        }
-        else
-        {
-            return textureLength;
-        }
-    }
-
-    return 1024;
-}

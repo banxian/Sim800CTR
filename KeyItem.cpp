@@ -72,6 +72,7 @@ void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
     setRGB(render, bgcolor);
     render.FillRectangle(fRect.x, fRect.y, fRect.w, fRect.h);
     setRGB(render, framecolor);
+    render.SetPointSize(2);
     render.DrawLine(fRect.x, fRect.y, fRect.x + fRect.w, fRect.y);
     render.DrawLine(fRect.x, fRect.y + fRect.h, fRect.x + fRect.w, fRect.y + fRect.h);
     render.DrawLine(fRect.x, fRect.y, fRect.x, fRect.y + fRect.h);
@@ -91,6 +92,7 @@ void TKeyItem::paintSelf( demo::RenderSystemDrawing & render )
     //render.SetColor(1.0, 1.0, 1.0); // white
     //painter.drawText(fRect, Qt::AlignCenter | Qt::AlignHCenter | Qt::TextWrapAnywhere, fGraphic);
     render.DrawText(fRect.x + 2, fRect.y + 2, "%s", fGraphic.c_str());
+    render.DrawText(fRect.x + 2, fRect.y + 14, "%s", fSubscript.c_str());
     if (fSubscript.empty() == false) {
         //painter.setPen(QPen(QColor(0xFFFDE8), 2, Qt::SolidLine));
         //painter.drawText(fRect.adjusted(2,2,-2,-2), Qt::AlignRight | Qt::AlignBottom | Qt::TextWrapAnywhere, fSubscript);

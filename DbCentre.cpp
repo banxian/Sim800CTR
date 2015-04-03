@@ -12,7 +12,7 @@ void LoadAppSettings( void )
 
     StateSetting.RegEditorMaxium = true;
 
-    GlobalSetting.SPDC1016Frequency = 3686400;
+    GlobalSetting.SPDC1016Frequency = 3686400 * 1.5;
 }
 
 void SaveAppSettings( void )

@@ -106,7 +106,13 @@ bool TNekoDriver::RunDemoBin( const std::string& filename )
         hardlog("LoadBROM\n");
         LoadBROM("rom:/obj.bin");
         hardlog("LoadFullNorFlash\n");
-        LoadFullNorFlash("rom:/cc800.fls");
+        nn::fs::FileInputStream sdmcfls;
+        nn::Result r = sdmcfls.TryInitialize(L"sdmc:/cc800.fls");
+        if (r.IsFailure() && nn::fs::ResultNotFound::Includes(r)) {
+            LoadFullNorFlash("rom:/cc800.fls");
+        } else {
+            LoadFullNorFlash("sdmc:/cc800.fls");
+        }
         //fixedram0000[io00_bank_switch] = 2;
         //SwitchNorBank(2);
         //*(unsigned short*)&(pmemmap[mapE000][0x1FFC]) = 0x4018; // mario.bin

@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include "demo.h"
 
-#include "../Common/FsSampleCommon.h"
+#include "FsSampleCommon.h"
 #include "SaveDataExporter.h"
 
 using namespace nn;

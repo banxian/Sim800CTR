@@ -5,8 +5,11 @@
 #include "wintypes.h"
 #include "CheatTypes.h"
 
-
+#ifdef SHIP_BUILD
+#define hardlog(format,...)
+#else
 void hardlog(const char* format, ...);
+#endif
 
 bool QRectContains(const QRect& rect, int x, int y);
 

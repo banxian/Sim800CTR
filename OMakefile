@@ -15,6 +15,7 @@
 #----------------------------------------------------------------------------
 
 SAMPLED_DEMOS_COMMON_INCLUDE_DIR   =   $(dir ../../common/include)
+SAMPLED_DEMOS_COMMON_SRC_DIR   =   $(dir ../../common/libraries/demo)
 INCLUDES           +=   $(SAMPLED_DEMOS_COMMON_INCLUDE_DIR)
 
 # Describes the target that the process supports.
@@ -25,7 +26,7 @@ CTR_APPTYPE = CARD SD
 
 # Specifies the source code to build.
 SOURCES[]           =
-                        ../Common/FsSampleCommon.cpp
+                        FsSampleCommon.cpp
                         SaveDataExporter.cpp
                         MainUntFrame.cpp
                         KeyItem.cpp
@@ -40,6 +41,12 @@ SOURCES[]           =
                         ANSI/w65c02cpu.cpp
                         ANSI/w65c02op.cpp
                         AddonFuncUnt.cpp
+                        glesstripedata.c
+			$(SAMPLED_DEMOS_COMMON_SRC_DIR)/Render/demo_DisplayBuffers.cpp
+			$(SAMPLED_DEMOS_COMMON_SRC_DIR)/Render/demo_FrameBuffer.cpp
+			$(SAMPLED_DEMOS_COMMON_SRC_DIR)/Render/demo_GraphicsDrawing.cpp
+			$(SAMPLED_DEMOS_COMMON_SRC_DIR)/Render/demo_RenderSystemDrawing.cpp
+			$(SAMPLED_DEMOS_COMMON_SRC_DIR)/Render/demo_RenderSystem.cpp
 
 
 CXXFLAGS	+= --asm --interleave
@@ -57,7 +64,7 @@ CTR_BANNER_SPEC     =   Sim800.bsf
 
 #SHADER_BIN          =   nnfont_RectDrawerShader.shbin
 
-LIBS               +=   lib_demo lib_applet libnn_enc
+LIBS               +=   lib_applet libnn_enc
 
 # Specifies the file root that is included in the ROM .
 # Files under this path will be loaded from the file system that the ROM includes.

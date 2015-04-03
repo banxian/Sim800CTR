@@ -24,6 +24,7 @@ unsigned int GetTickCount()
 }
 #endif
 
+#ifndef SHIP_BUILD
 void hardlog(const char* format, ...)
 {
     nn::fs::FileOutputStream logfile;
@@ -44,3 +45,4 @@ void hardlog(const char* format, ...)
         }
     }
 }
+#endif

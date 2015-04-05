@@ -22,7 +22,7 @@
 #include "demo.h"
 
 #include "FsSampleCommon.h"
-#include "SaveDataExporter.h"
+#include "MainUntFrameHelper.h"
 
 using namespace nn;
 
@@ -85,8 +85,8 @@ void screenlog(bool upper, const char* format, ...)
 //{
 //    nn::fs::FileOutputStream logfile;
 
-//    nn::Result r = nn::fs::TryCreateFile(L"sdmc:/sde.txt", 0);
-//    r = logfile.TryInitialize(L"sdmc:/sde.txt", true);
+//    nn::Result r = nn::fs::TryCreateFile(L"sdmc:/sim800_log.txt", 0);
+//    r = logfile.TryInitialize(L"sdmc:/sim800_log.txt", true);
 //    bool logok = r.IsSuccess();
 
 //    if (logok) {

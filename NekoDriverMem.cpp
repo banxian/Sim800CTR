@@ -879,7 +879,11 @@ bool TNekoDriver::LoadBROM( const std::string& filename )
 
 bool TNekoDriver::LoadFullNorFlash( const std::string& filename )
 {
-    fNorFilename = "sdmc:/cc800.fls"; //filename;
+#ifdef CARD2
+    fNorFilename = "data:/cc800.fls"; //filename;
+#else
+    fNorFilename = "sdmc:/cc800.fls";
+#endif
     nn::fs::FileInputStream norfile;
     nn::Result r = norfile.TryInitialize(filename.c_str());
     hardlog("LoadFullNorFlash: TryInitialize: 0x%08X\n", r.GetPrintableBits());
@@ -909,7 +913,13 @@ bool TNekoDriver::LoadFullNorFlash( const std::string& filename )
 bool TNekoDriver::SaveFullNorFlash()
 {
     nn::fs::FileOutputStream norfile;
-    norfile.TryInitialize(fNorFilename.c_str(), true); // ?!
+    nn::Result r = norfile.TryInitialize(fNorFilename.c_str(), true); // ?!
+
+    if (r.IsFailure() && nn::fs::ResultNotFound::Includes(r)) {
+        hardlog("try create nor flash %s.\n", fNorFilename.c_str());
+        r = nn::fs::TryCreateFile(fNorFilename.c_str(), 0x8000 * 0x10);
+    }
+
     int page = 0;
     while (page < 0x10) {
         s32 writed;
@@ -918,6 +928,9 @@ bool TNekoDriver::SaveFullNorFlash()
         page++;
     }
     norfile.Finalize();
+#ifdef CARD2
+    nn::fs::CommitSaveData();
+#endif
     fFlashUpdated = false;
     return true;
 }

@@ -3,6 +3,9 @@ BasicInfo:
   Title		: "sim800j"
   CompanyCode	: "00"
   ProductCode	: "CTR-P-SM8J"
+# Card1 From 128MB~8GB
+# Card2 From 512MB~8GB
+#  MediaSize	: 512MB
   MediaSize	: 128MB
 
 Rom:

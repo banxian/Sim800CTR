@@ -23,7 +23,7 @@
 #include "demo.h"
 
 #include "FsSampleCommon.h"
-#include "SaveDataExporter.h"
+#include "MainUntFrameHelper.h"
 #include "KeyItem.h"
 #include "NekoDriver.h"
 #include "AddonFuncUnt.h"
@@ -952,6 +952,33 @@ void Initialize(demo::RenderSystemDrawing& render)
     //s_IsWorkerThreadAlive = true;
     //NN_ERR_THROW_FATAL_ALL(s_WorkerThread.TryStartUsingAutoStack(&WorkerThread, 4 * 1024, nn::os::Thread::GetCurrentPriority() + 1));
 
+#ifdef CARD2
+    nn::Result result = nn::fs::MountSaveData();
+
+    if(result.IsFailure()) {
+        if((result <= nn::fs::ResultNotFormatted()) ||
+            (result <= nn::fs::ResultBadFormat()) ||
+            (result <= nn::fs::ResultVerificationFailed()))
+        {
+            screenlog(true, "Ooops. need to format save data...\n");
+
+            const size_t    maxFiles        = 8;
+            const size_t    maxDirectories  = 8;
+            const bool      isDuplicateAll  = true; // Duplicates the entire save data region
+
+            result = nn::fs::FormatSaveData(maxFiles, maxDirectories, isDuplicateAll);
+            if(result.IsFailure()) {
+                screenlog(true, "Cannot format save data!\n");
+            }
+        }
+
+        result = nn::fs::MountSaveData();
+        if(result.IsFailure()) {
+            screenlog(true, "2nd mount, almost failed...\n");
+        }
+    }
+#endif
+
     hardlog("new TNekoDriver\n");
     theNekoDriver = new TNekoDriver(); // <- stop
 
@@ -977,6 +1004,9 @@ void Finalize(demo::RenderSystemDrawing &render)
 
     nn::fs::Unmount("rom:");
     nn::fs::Unmount("sdmc:");
+#ifdef CARD2
+    nn::fs::Unmount("data:");
+#endif
 
     render.DeleteTexture(fStripeID);
 }

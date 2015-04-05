@@ -106,12 +106,21 @@ bool TNekoDriver::RunDemoBin( const std::string& filename )
         hardlog("LoadBROM\n");
         LoadBROM("rom:/obj.bin");
         hardlog("LoadFullNorFlash\n");
+#ifdef CARD2
+        nn::fs::FileInputStream savefls;
+        nn::Result r = savefls.TryInitialize(L"data:/cc800.fls");
+#else
         nn::fs::FileInputStream sdmcfls;
         nn::Result r = sdmcfls.TryInitialize(L"sdmc:/cc800.fls");
+#endif
         if (r.IsFailure() && nn::fs::ResultNotFound::Includes(r)) {
             LoadFullNorFlash("rom:/cc800.fls");
         } else {
+#ifdef CARD2
+            LoadFullNorFlash("data:/cc800.fls");
+#else
             LoadFullNorFlash("sdmc:/cc800.fls");
+#endif
         }
         //fixedram0000[io00_bank_switch] = 2;
         //SwitchNorBank(2);
